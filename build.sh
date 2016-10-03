@@ -81,7 +81,7 @@ package() {
 	[ ! -d $INITRD_DST ] && logWarn "The output directory [${INITRD_DST}] doesn't exist, making it" && mkdir -p $INITRD_DST
 
 	logDebug "Build CPIO package and compressing to output file"
-	find . | cpio -o -H newc 2>/dev/null | gzip > $INITRD_DST/initrd.gz
+	find . ! -name '.gitkeep' | cpio -o -H newc 2>/dev/null | gzip > $INITRD_DST/initrd.gz
 
 	logDebug "Changing back to the previous directory"
 	cd - >/dev/null
