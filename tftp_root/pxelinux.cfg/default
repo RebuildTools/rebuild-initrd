@@ -1,0 +1,6 @@
+DEFAULT REBUILD_TEST
+
+LABEL REBUILD_TEST
+	MENU Rebuild Test
+	KERNEL kernel/linux
+	APPEND initrd=images/initrd.gz loglevel=6
