@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# Rebuild Agent - Helper Functions
+# ================================
+#
+# The helper functions are just that,
+# a set of functions designed to make
+# the operation of the Agent a little
+# bit simpler without having to delcare
+# chunks of code again and again.
+#
+# Author: Liam Haworth <liam@haworth.id.au>
+#
+
+COLOR_DEFAULT=$(echo -e "\033[0m")
+COLOR_BLUE=$(echo -e "\033[34m")
+COLOR_GREEN=$(echo -e "\033[32m")
+COLOR_YELLOW=$(echo -e "\033[33m")
+COLOR_RED=$(echo -e "\033[31m")
+
+#// Prints a nicely colored and
+#// formated log line to the console
+#//
+#// PARAMS:
+#//   $1 String - Logging Level (DEBUG, INFO, WARN, PANIC, FATAL)
+#//   $2 String - The message to log
+log() {
+	local TIMESTAMP=$(date +"%b %e %I:%M:%S")
+
+	if [ "${1}" == "DEBUG" ]; then
+		local LOG_COLOR=$COLOR_BLUE
+	elif [ "${1}" == "INFO" ]; then
+		local LOG_COLOR=$COLOR_GREEN
+	elif [ "${1}" == "WARN" ]; then
+		local LOG_COLOR=$COLOR_YELLOW
+	else
+		local LOG_COLOR=$COLOR_RED
+	fi
+
+	printf "[%s] %s%+5s%s %s\n" "${TIMESTAMP}" "${LOG_COLOR}" "${1}" "${COLOR_DEFAULT}" "${2}"
+}
+
+#// Checks the LOGLEVEL environment
+#// variable to see if it is set,
+#// if it isn't then it is set to "INFO",
+#// otherwise the variable is returned as is.
+#//
+#// RETURNS: Int - The Logging Level
+getLoggingLevel() {
+	if [ -z "${LOGLEVEL}" ]; then
+		LOGLEVEL=4 # Set the default LOGLEVEL to INFO
+	fi
+
+	echo $LOGLEVEL
+}
+
+#// Quick definitions for each log
+#// level so they can be called quickly
+#// or with extra handling
+#//
+#// PARAMS:
+#//   $@ String - All input is used as the log message
+logDebug() { 
+	[ $(getLoggingLevel) -ge 5 ] && log "DEBUG" "$@" || echo -n
+}
+
+logInfo() { 
+	[ $(getLoggingLevel) -ge 4 ] && log "INFO" "$@" || echo -n
+}
+
+logWarn() { 
+	[ $(getLoggingLevel) -ge 3 ] && log "WARN" "$@" || echo -n
+}
+
+logPanic() { 
+	[ $(getLoggingLevel) -ge 2 ] && log "PANIC" "$@" || echo -n
+}
+
+logFatal() { 
+	[ $(getLoggingLevel) -ge 1 ] && log "FATAL" "$@" || echo -n
+	exit 1 
+}
+

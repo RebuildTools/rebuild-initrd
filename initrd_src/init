@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# Rebuild Agent Entry Point
+# =========================
+#
+# The Rebuild Agent is a live, in-memory
+# system that profiles a machine and sends
+# the details (CPU, Memory, Disk, etc) back
+# to the Rebuild Core.
+#
+# Author: Liam Haworth <liam@haworth.id.au)
+#
+
+# Set the PATH for the system
+export PATH=/bin:/sbin:/usr/bin
+
+# Load in helper functions
+. /lib/rebuild/functions
+
+# Clear the screen
+clear
+
+logInfo "Initializing environment for the Rebuild Agent"
+
+
+### Mount the basic system mounts
+
+logInfo "Mounting /proc"
+[ ! -d /proc ] && mkdir /proc
+mount -t proc /proc /proc
+
+logInfo "Mounting /sys"
+[ ! -d /sys ] && mkdir /sys
+mount -t sysfs /sys /sys
+
+logInfo "Ensuring /mnt exists"
+[ ! -d /mnt ] && mkdir /mnt
+
+logInfo "Mounting /dev"
+mount -t devtmpfs none /dev
+
+
+### Bring up network interfaces
+
+logInfo "Bringing up network interfaces"
+for interface in $(ip a | grep -v "LOOPBACK" | grep -r "eth[0-9]" | awk '{split($2,a,":"); print a[1]}'); do
+	logDebug "Setting interface [${interface}] to UP"
+	ip link set dev $interface up
+done
+
+logInfo "Waiting 5 seconds for the interfaces to activate"
+sleep 5
+
+logInfo "Attempting DHCP on active interfaces"
+for interface in $(ip a | grep -v "LOOPBACK" | grep -v "NO-CARRIER" | grep -r "eth[0-9]" | awk '{split($2,a,":"); print a[1]}'); do
+	logDebug "Running DHCP on interface [${interface}]"
+	udhcpc -i $interface > /dev/null
+done
+
+
+### Drop down into the agent
+
+logInfo "Starting the Rebuild Agent"
+#exec /bin/rebuild-agent
+exec /bin/bash
