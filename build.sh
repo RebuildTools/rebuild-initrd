@@ -137,15 +137,13 @@ buildKernel() {
 
 	runCmd "Making temporary build directory for Linux Kernel" "mkdir ${KERNEL_TMP_DIR}"
 
-	runCmd "Cloning Linux Kernel source" "git clone ${KERNEL_SRC_GIT} ${KERNEL_TMP_DIR}"
+	runCmd "Cloning Linux Kernel source" "git clone --branch ${KERNEL_VERSION_TAG} --depth 1 ${KERNEL_SRC_GIT} ${KERNEL_TMP_DIR}"
 
 	logDebug "Copying kernel build config to source directory"
 	\cp -f $KERNEL_BUILD_CONFIG $KERNEL_TMP_DIR/.config
 
 	logDebug "Changing directory to source"
 	cd $KERNEL_TMP_DIR
-
-	runCmd "Checking out to the desired kernel version" "git checkout tags/${KERNEL_VERSION_TAG}"
 
 	local buildCoreUse=$(($(getCpuCount)/2))
 	runCmd "Compiling kernel with [${buildCoreUse}] CPUs" "make -j${buildCoreUse}"
