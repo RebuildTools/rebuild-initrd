@@ -1,4 +1,4 @@
-Rebuild Agent [![Apache v2.0](https://img.shields.io/badge/License-Apache%20v2.0-blue.svg?style=flat-square)](http://www.apache.org/licenses/LICENSE-2.0)
+Rebuild Agent [![Apache v2.0](https://img.shields.io/badge/License-Apache%20v2.0-blue.svg?style=flat-square)](http://www.apache.org/licenses/LICENSE-2.0) [![Github Releases](https://img.shields.io/github/downloads/RebuildTools/rebuild-agent/latest/total.svg?maxAge=2592000?style=flat-square)](https://github.com/RebuildTools/rebuild-agent/releases)
 =============
 
 _Lightweight system profiling for Rebuild_
