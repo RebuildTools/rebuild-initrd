@@ -46,7 +46,7 @@ Thumbs.db
 
 # Custom ignores #
 ##################
-tftp_root/kernel
+linux-kernel
 .vagrant
 output/
 !output/.gitkeep
