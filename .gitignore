@@ -48,3 +48,5 @@ Thumbs.db
 ##################
 tftp_root/kernel
 .vagrant
+output/
+!output/.gitkeep
