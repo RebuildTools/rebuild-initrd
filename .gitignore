@@ -50,3 +50,5 @@ tftp_root/kernel
 .vagrant
 output/
 !output/.gitkeep
+*.lock
+vendor/
