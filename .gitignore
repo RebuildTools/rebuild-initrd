@@ -32,7 +32,7 @@
 
 # Text editor swap files #
 ##########################
-.sw[a-z]
+*.sw[a-z]
 
 # OS generated files #
 ######################
