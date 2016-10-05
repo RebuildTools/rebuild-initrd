@@ -157,15 +157,15 @@ buildKernel() {
 	logDebug "Copying compiled kernel to output directory"
 	\cp -f $KERNEL_TMP_DIR/arch/x86/boot/bzImage $OUTPUT_DIRECTORY/linux-kernel
 
-	logInfo "Finished build the Linux Kernel, final output file: ${OUTPUT_DIRECTORY}/linux-kernel"
+	logInfo "Finished building the Linux Kernel, final output file: ${OUTPUT_DIRECTORY}/linux-kernel"
 }
 
 #// Packages the intird source into
 #// gzip compressed CPIO archive that
 #// can be unpacked and executed by the
 #// Linux Kernel
-package() {
-	logInfo "Packaging the final ram disk image"
+buildInitrd() {
+	logInfo "Building RAM disk image"
 
 	checkForBinary "cpio"
 	checkForBinary "gzip"
@@ -183,7 +183,7 @@ package() {
 	logDebug "Changing back to the previous directory"
 	cd - >/dev/null
 
-	logInfo "Finished packaging the ram disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
+	logInfo "Finished building the RAM disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
 }
 
 #####
@@ -206,21 +206,21 @@ showHelp() {
 
 	echo -e "\t=== GLOBAL ==="	
 	printf "\t%-20s - %s\n" "LOGLEVEL" "Sets the logging level of the build script (Default: 4 | 1 - PANIC, 2 - FATAL, 3 - WARN, 4 - INFO, 5 - DEBUG)"
+	printf "\t%-20s - %s\n" "OUTPUT" "Defines the final output location for compiled/built files (Default: ${SCRIPTPATH}/output)"
 
 	printf "\n\t=== TASK: %-10s ===\n" "buildKernel"
 	printf "\t%-20s - %s\n" "KERNEL_BUILD_CONFIG" "Defines the path to the Linux Kernel build config (Default: ${SCRIPTPATH}/linux-kernel.config)"
 	printf "\t%-20s - %s\n" "KERNEL_VERSION_TAG" "Defines the git tag of desired Linux Kernel version (Default: v4.8)"
 	printf "\t%-20s - %s\n" "KERNEL_TPM_DIR" "Defines the temp directory used when compiling the kernel (Default: /tmp/rebuild_linux_kernel_src)"
 
-	printf "\n\t=== TASK: %-10s ===\n" "package"
+	printf "\n\t=== TASK: %-10s ===\n" "buildInitrd"
 	printf "\t%-20s - %s\n" "INITRD_SRC" "Defines the location of the ram disk source files (Default: ${SCRIPTPATH}/initrd_src)"
-	printf "\t%-20s - %s\n" "INITRD_DST" "Defines the output location of the packaged initrd file (Default: ${SCRIPTPATH}/output)"
 
 
 	echo -e "\nTasks:"
 	printf "\t%-20s - %s\n" "showHelp" "Shows this help message"
 	printf "\t%-20s - %s\n" "buildKernel" "Downloads and compiles the Linux Kernel with the Rebuild Agent kernel configuration"
-	printf "\t%-20s - %s\n" "package" "Packages the ram disk source (initrd_src) into the final ram disk image"
+	printf "\t%-20s - %s\n" "buildInitrd" "Packages the ram disk source (initrd_src) into the final ram disk image"
 
 	echo -e "\n\n"
 }
