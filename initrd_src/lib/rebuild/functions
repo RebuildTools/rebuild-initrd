@@ -37,7 +37,7 @@ log() {
 		local LOG_COLOR=$COLOR_RED
 	fi
 
-	printf "[%s] %s%+5s%s %s\n" "${TIMESTAMP}" "${LOG_COLOR}" "${1}" "${COLOR_DEFAULT}" "${2}"
+	printf "[%s] %s%+5s%s %b\n" "${TIMESTAMP}" "${LOG_COLOR}" "${1}" "${COLOR_DEFAULT}" "${2}"
 }
 
 #// Checks the LOGLEVEL environment
