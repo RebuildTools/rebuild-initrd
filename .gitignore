@@ -52,3 +52,4 @@ output/
 !output/.gitkeep
 *.lock
 vendor/
+initrd_staging/
