@@ -17,20 +17,20 @@ Vagrant.configure("2") do |config|
     sudo echo -e "subnet 192.168.56.0 netmask 255.255.255.0 {\\n  range 192.168.56.10 192.168.56.50;\\n  filename \\"pxelinux.0\\";\\n}" >> /etc/dhcp/dhcpd.conf
     sudo sed -i 's/\\/var\\/lib\\/tftpboot/\\/tftpboot/' /etc/default/tftpd-hpa
 
-    # Restart the services
-    service isc-dhcp-server restart
-    service tftpd-hpa restart
-
     # Download the required files for the PXE Boot System
     mkdir /tmp/syslinux
     cd /tmp/syslinux
-    wget https://www.kernel.org/pub/linux/utils/boot/syslinux/Testing/6.04/syslinux-6.04-pre1.zip
-    unzip syslinux-6.04-pre1.zip
+    wget -q https://www.kernel.org/pub/linux/utils/boot/syslinux/Testing/6.04/syslinux-6.04-pre1.zip
+    unzip syslinux-6.04-pre1.zip >/dev/null
 
     \\cp -f bios/core/pxelinux.0 /tftpboot/
     \\cp -f bios/com32/elflink/ldlinux/ldlinux.c32 /tftpboot/
     \\cp -f bios/com32/menu/vesamenu.c32 /tftpboot/
     \\cp -f bios/com32/lib/libcom32.c32 /tftpboot/
     \\cp -f bios/com32/libutil/libutil.c32 /tftpboot/
+
+    # Restart the services
+    service isc-dhcp-server restart
+    service tftpd-hpa restart
   SHELL
 end
