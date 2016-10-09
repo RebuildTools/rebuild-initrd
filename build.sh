@@ -34,6 +34,13 @@ GLIBC_TMP_DIR=$TEMP_DIR/glibc
 ## Task: buildInitrd
 [ -z "${INITRD_SRC}" ] && INITRD_SRC=$SCRIPTPATH/initrd_src
 
+#// Dependency format: SOURCE_URL % VERSION % DOWNLOAD_TYPE % BUILD_METHOD
+declare -A INITRD_DEPENDENCIES=(\
+	[coreutils]="http://git.savannah.gnu.org/cgit/coreutils.git % v8.25 % git % bootstrap_configure"\
+	[bash]="http://git.savannah.gnu.org/cgit/bash.git % bash-4.4 % git % configure"\ 
+	[dhcp]="https://github.com/marschap/debian-isc-dhcp % upstream % git % configure"\
+	[iproute2]="git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2.git % v4.7.0 % git % configure"
+)
 
 ## Task: buildKernel
 KERNEL_SRC_GIT="https://github.com/torvalds/linux.git"
@@ -156,64 +163,12 @@ buildKernel() {
 	cd - >/dev/null
 
 	logDebug "Checking for destination directory: ${OUTPUT_DIRECTORY}"
-	[ ! -d $INITRD_DST ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
+	[ ! -d $OUTPUT_DIRECTORY ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
 
 	logDebug "Copying compiled kernel to output directory"
 	\cp -f $KERNEL_TMP_DIR/arch/x86/boot/bzImage $OUTPUT_DIRECTORY/linux-kernel
 
 	logInfo "Finished building the Linux Kernel, final output file: ${OUTPUT_DIRECTORY}/linux-kernel"
-}
-
-prepareStagingInitrd() {
-	logInfo "Preparing a staging environment for the RAM disk"
-	local buildCoreUse=$(getCpuCount)
-
-	[ -d $STAGING_DIR ] && logDebug "Cleaning up old staging directory" && rm -rf $STAGING_DIR
-
-	logDebug "Making directory structure for staging"
-	mkdir -p $STAGING_DIR
-
-	pushd $STAGING_DIR >/dev/null
-	mkdir {bin,sys,dev,proc,etc,lib,usr}
-	ln -s bin sbin
-	ln -s lib lib64
-	popd >/dev/null
-
-
-	## Copying in Kernel Headers
-	logInfo "Copying Linux Headers"
-
-	[ ! -d $KERNEL_TMP_DIR ] && logFatal "Could not locate the Linux Kernel sources, please run \"buildKernel\""
-
-	logDebug "Changing directories to Linux Kernel source" && cd $KERNEL_TMP_DIR
-
-	runCmd "Runing clean command on Linux Kernel" "make clean"
-
-	runCmd "Preparing Linux Kernel headers" "make headers_install"
-
-	runCmd "Copying Linux Kernel headers" "cp -r ${KERNEL_TMP_DIR}/usr/include ${STAGING_DIR}/usr/"
-
-	cd - >/dev/null
-
-
-	# Compile GNU Lib C
-	logInfo "Compiling GNU Lib C"
-
-	[ -d $GLIBC_TMP_DIR ] && logDebug "Clearing old GNU Lib C files" && rm -rf $GLIBC_TMP_DIR
-
-	runCmd "Cloning GNU Lib C source" "git clone --branch ${STAGING_GLIBC_VER} ${GLIBC_SRC_GIT} ${GLIBC_TMP_DIR}"
-
-	runCmd "Making compile directory to build in" "mkdir ${GLIBC_TMP_DIR}/compile_root"
-
-	logDebug "Changing directories to GNU Lib C source" && cd $GLIBC_TMP_DIR/compile_root
-
-	runCmd "Configure GNU Lib C sources" "../configure --prefix=/usr"
-
-	runCmd "Compile GNU Lib C source" "make -j${buildCoreUse}"
-	
-	runCmd "Installing compiled GNU Lib C" "make -j${buildCoreUse} install DESTDIR=${STAGING_DIR}"
-
-	cd - >/dev/null
 }
 
 #// Packages the intird source into
@@ -223,21 +178,101 @@ prepareStagingInitrd() {
 buildInitrd() {
 	logInfo "Building RAM disk image"
 
+	## Check for required tools
 	checkForBinary "cpio"
 	checkForBinary "gzip"
+	checkForBinary "gcc"
+	checkForBinary "make"
 
+
+	## Check and build directories
 	logDebug "Checking for source files directory: ${INITRD_SRC}"
-	if [ ! -d $INITRD_SRC ]; then logFatal "The provided source directory [${INITRD_SRC}] doesn't exist!"
-	else logDebug "Changing directories into the source directory" && cd $INITRD_SRC; fi
+	[ ! -d $INITRD_SRC ] && logFatal "The provided source directory [${INITRD_SRC}] doesn't exist!"
 
 	logDebug "Checking for destination directory: ${OUTPUT_DIRECTORY}"
-	[ ! -d $INITRD_DST ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
+	[ ! -d $OUTPUT_DIRECTORY ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
+
+	local BUILD_DIR=$TEMP_DIR/initrd_build
+	if [ -d $BUILD_DIR ]; then
+		logWarn "Build directory exists, clearing it"
+		rm -rf $BUILD_DIR
+	fi 
+	
+	logDebug "Making temporary build directory"
+	mkdir -p $BUILD_DIR
+	
+	local DEP_DIR=$TEMP_DIR/initrd_dep
+	if [ -d $DEP_DIR ]; then
+		logWarn "Dependencies directory exists, clearing it"
+		rm -rf $DEP_DIR
+	fi
+	
+	logDebug "Making temporary dependencies directory"
+	mkdir -p $DEP_DIR
+
+	logDebug "Building directory structure"
+	pushd $BUILD_DIR >/dev/null
+	mkdir -p {bin,sys,dev,proc,etc,lib,usr}
+	[ ! -d sbin ] && ln -s bin sbin
+	[ ! -d lib64 ] && ln -s lib lib64
+	popd >/dev/null
+
+
+	## Build required third-party binaries
+	logDebug "Downloading and building dependencies"
+	for dep in ${!INITRD_DEPENDENCIES[@]}; do
+		local depString=${INITRD_DEPENDENCIES[$dep]}
+		local depSource=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[1]); print a[1]}')
+		local depVersion=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[2]); print a[2]}')
+		local depDownloadMethod=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[3]); print a[3]}')
+		local depBuildMethod=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[4]); print a[4]}')
+
+		logDebug "Downloading dependency [${dep} - ${depVersion}]"
+
+		logDebug "Making temporary directory for dependency"
+		mkdir -p $DEP_DIR/$dep
+
+		case $depDownloadMethod in
+			git) runCmd "Downloading dependency with GIT method" "git clone --branch ${depVersion} ${depSource} ${TEMP_DIR}/initrd_dep/${dep}";;
+
+			*) logFatal "Unsupport download method [${depDownloadMethod}]";;
+			#TODO Implement other methods for downloading (e.g. TAR)
+		esac
+
+		case $depBuildMethod in
+			configure | bootstrap_configure)
+				cd ${TEMP_DIR}/initrd_dep/${dep}
+				local makeCores=$(getCpuCount)
+
+				[ "${depBuildMethod}" == "bootstrap_configure" ] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
+				runCmd "Running \"configure\" on dependancy sources" "env CFLAGS=-Wunused ./configure"
+				runCmd "Making dependancy" "make -j${makeCores}"
+				runCmd "Install compiled dependancy" "make -j ${makeCores} install DESTDIR=${BUILD_DIR}"
+			;;
+		
+			*) logFatal "Unsupported build method [${depbuildMethod}]";;	
+			#TODO Implement other methods for building 
+		esac
+
+	done
+
+	## Copy dependant libraries for binaries
+	for sharedLibrary in $(for binFile in $(find $BUILD_DIR -executable -type f); do ldd $binFile; done | awk '/=>/{print $3}' | sort -u); do
+		logDebug "Copying library [${sharedLibrary}]"
+		mkdir -p $BUILD_DIR$(dirname $sharedLibrary)
+		\cp -f $sharedLibrary $BUILD_DIR$(dirname $sharedLibrary)/
+	done
+
+	\cp -f /lib64/ld-linux-x86-64.so.2 /lib64/ld-linux.so.2 $BUILD_DIR/lib/
+
+	## Copy Rebuild Agent initrd sources into build directory
+	#logDebug "Copying initrd sources into build directory" && \cp -rf $INITRD_SRC/* $BUILD_DIR
+
+	## Package initrd
+	logDebug "Changing directories into initrd build directory" && cd $BUILD_DIR
 
 	logDebug "Build CPIO package and compressing to output file"
 	find . ! -name '.gitkeep' | cpio -o -H newc 2>/dev/null | gzip > ${OUTPUT_DIRECTORY}/initrd.gz
-
-	logDebug "Changing back to the previous directory"
-	cd - >/dev/null
 
 	logInfo "Finished building the RAM disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
 }

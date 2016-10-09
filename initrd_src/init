@@ -11,6 +11,9 @@
 # Author: Liam Haworth <liam@haworth.id.au)
 #
 
+# Change Kernel logging level to quite it
+echo 5 > /proc/sys/kernel/printk
+
 # Set the PATH for the system
 export PATH=/bin:/sbin:/usr/bin
 
@@ -54,7 +57,7 @@ sleep 5
 logInfo "Attempting DHCP on active interfaces"
 for interface in $(ip a | grep -v "LOOPBACK" | grep -v "NO-CARRIER" | grep -r "eth[0-9]" | awk '{split($2,a,":"); print a[1]}'); do
 	logDebug "Running DHCP on interface [${interface}]"
-	udhcpc -i $interface > /dev/null
+	#udhcpc -i $interface > /dev/null
 done
 
 
