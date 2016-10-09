@@ -257,16 +257,14 @@ buildInitrd() {
 	done
 
 	## Copy dependant libraries for binaries
-	for sharedLibrary in $(for binFile in $(find $BUILD_DIR -executable -type f); do ldd $binFile; done | awk '/=>/{print $3}' | sort -u); do
+	for sharedLibrary in $(for binFile in $(find $BUILD_DIR -executable -type f); do ldd $binFile; done | awk '/=> \//{print $3}; /ld-linux/{print $1}' | sort -u); do
 		logDebug "Copying library [${sharedLibrary}]"
 		mkdir -p $BUILD_DIR$(dirname $sharedLibrary)
 		\cp -f $sharedLibrary $BUILD_DIR$(dirname $sharedLibrary)/
 	done
 
-	\cp -f /lib64/ld-linux-x86-64.so.2 /lib64/ld-linux.so.2 $BUILD_DIR/lib/
-
 	## Copy Rebuild Agent initrd sources into build directory
-	#logDebug "Copying initrd sources into build directory" && \cp -rf $INITRD_SRC/* $BUILD_DIR
+	logDebug "Copying initrd sources into build directory" && \cp -rf $INITRD_SRC/* $BUILD_DIR
 
 	## Package initrd
 	logDebug "Changing directories into initrd build directory" && cd $BUILD_DIR
