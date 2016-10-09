@@ -39,7 +39,7 @@ declare -A INITRD_DEPENDENCIES=(\
 	[coreutils]="http://git.savannah.gnu.org/cgit/coreutils.git % v8.25 % git % bootstrap_configure"\
 	[bash]="http://git.savannah.gnu.org/cgit/bash.git % bash-4.4 % git % configure"\ 
 	[dhcp]="https://github.com/marschap/debian-isc-dhcp % upstream % git % configure"\
-	[iproute2]="git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2.git % v4.7.0 % git % configure"
+	[iproute2]="git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2.git % v4.4.0 % git % configure"
 )
 
 ## Task: buildKernel
