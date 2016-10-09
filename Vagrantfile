@@ -32,11 +32,5 @@ Vagrant.configure("2") do |config|
     \\cp -f bios/com32/menu/vesamenu.c32 /tftpboot/
     \\cp -f bios/com32/lib/libcom32.c32 /tftpboot/
     \\cp -f bios/com32/libutil/libutil.c32 /tftpboot/
-
-    # Download the Debian Linux Kernel
-    mkdir -p /tftpboot/kernel
-    rm -f /tftpboot/kernel/linux
-    cd /tftpboot/kernel
-    wget http://mirror.aarnet.edu.au/debian/dists/wheezy/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux
   SHELL
 end
