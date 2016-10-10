@@ -212,8 +212,9 @@ buildInitrd() {
 
 	logDebug "Building directory structure"
 	pushd $BUILD_DIR >/dev/null
-	mkdir -p {bin,sys,dev,proc,etc,lib,usr}
-	[ ! -d sbin ] && ln -s bin sbin
+	mkdir -p {sys,dev,proc,etc,lib,usr/local/bin}
+	[ ! -d sbin ] && ln -s usr/local/bin bin
+	[ ! -d sbin ] && ln -s usr/local/bin sbin
 	[ ! -d lib64 ] && ln -s lib lib64
 	popd >/dev/null
 
