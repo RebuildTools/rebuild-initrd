@@ -39,7 +39,9 @@ declare -A INITRD_DEPENDENCIES=(\
 	[coreutils]="http://git.savannah.gnu.org/cgit/coreutils.git % v8.25 % git % bootstrap_configure"\
 	[bash]="http://git.savannah.gnu.org/cgit/bash.git % bash-4.4 % git % configure"\ 
 	[dhcp]="https://github.com/marschap/debian-isc-dhcp % upstream % git % configure"\
-	[iproute2]="git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2.git % v4.4.0 % git % configure"
+	[iproute2]="git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2.git % v4.4.0 % git % configure"\
+	[ncurses]="http://git.savannah.gnu.org/cgit/guile-ncurses.git % guile-ncurses-1.2 % git % bootstrap_configure"\
+	[util-linux]="git://git.kernel.org/pub/scm/utils/util-linux/util-linux.git % stable/v2.28 % git % autogen_configure"
 )
 
 ## Task: buildKernel
@@ -241,11 +243,12 @@ buildInitrd() {
 		esac
 
 		case $depBuildMethod in
-			configure | bootstrap_configure)
+			configure | bootstrap_configure | autogen_configure)
 				cd ${TEMP_DIR}/initrd_dep/${dep}
 				local makeCores=$(getCpuCount)
 
 				[ "${depBuildMethod}" == "bootstrap_configure" ] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
+				[ "${depBuildMethod}" == "autogen_configure" ] && runCmd "Running \"autogen\" on dependancy sources" "./autogen.sh"
 				runCmd "Running \"configure\" on dependancy sources" "env CFLAGS=-Wunused ./configure"
 				runCmd "Making dependancy" "make -j${makeCores}"
 				runCmd "Install compiled dependancy" "make -j ${makeCores} install DESTDIR=${BUILD_DIR}"
