@@ -11,20 +11,16 @@
 # Author: Liam Haworth <liam@haworth.id.au)
 #
 
-# Change Kernel logging level to quite it
-echo 5 > /proc/sys/kernel/printk
-
 # Set the PATH for the system
 export PATH=/bin:/sbin:/usr/bin
 
-# Load in helper functions
+### Load in helper functions
 . /lib/rebuild/functions
 
-# Clear the screen
+### Clear the screen
 clear
 
 logInfo "Initializing environment for the Rebuild Agent"
-
 
 ### Mount the basic system mounts
 
@@ -42,6 +38,8 @@ logInfo "Ensuring /mnt exists"
 logInfo "Mounting /dev"
 mount -t devtmpfs none /dev
 
+### Change Kernel logging level to quite it
+echo 5 > /proc/sys/kernel/printk
 
 ### Bring up network interfaces
 
