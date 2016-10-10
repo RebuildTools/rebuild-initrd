@@ -43,7 +43,9 @@ declare -A INITRD_DEPENDENCIES=(\
 	[ncurses]="https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.0.tar.gz % ncurses-6.0 % tar_gz % configure"\
 	[util-linux]="git://git.kernel.org/pub/scm/utils/util-linux/util-linux.git % stable/v2.28 % git % autogen_configure % --disable-makeinstall-chown"\
 	[gawk]="http://git.savannah.gnu.org/cgit/gawk.git % gawk-4.1.4 % git % configure" \
-	[grep]="http://git.savannah.gnu.org/r/grep.git % v2.26 % git % bootstrap_configure"
+	[grep]="http://git.savannah.gnu.org/r/grep.git % v2.26 % git % bootstrap_configure" \
+	[tmux]="https://github.com/tmux/tmux.git % 2.3 % git % autogen_configure" \
+	[glibc]="http://sourceware.org/git/glibc.git % glibc-2.24 % git % configure_subdir_noflags % --disable-sanity-checks"
 )
 
 ## Task: buildKernel
@@ -258,18 +260,26 @@ buildInitrd() {
 		esac
 
 		case $depBuildMethod in
-			configure | bootstrap_configure | autogen_configure)
+			*configure*)
 				cd ${TEMP_DIR}/initrd_dep/${dep}
 				local makeCores=$(getCpuCount)
 
-				[ "${depBuildMethod}" == "bootstrap_configure" ] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
-				[ "${depBuildMethod}" == "autogen_configure" ] && runCmd "Running \"autogen\" on dependancy sources" "./autogen.sh"
+				[[ "${depBuildMethod}" == *"subdir"* ]] && logDebug "Making sub directory for build" && mkdir -p ./rebuild_compile_dir && cd ./rebuild_compile_dir
+				[[ "${depBuildMethod}" == *"bootstrap"* ]] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
+				[[ "${depBuildMethod}" == *"autogen"* ]] && runCmd "Running \"autogen\" on dependancy sources" "./autogen.sh"
 
-				export CFLAGS="-Wunused"
-				export CPPFLAGS="-P"
+				if [[ "${depBuildMethod}" != *"noflags"* ]]; then 
+					export CFLAGS="-Wunused"
+					export CPPFLAGS="-P"
+				fi
+
 				runCmd "Running \"configure\" on dependancy sources" "./configure ${depBuildConfigureFlags}"
 				runCmd "Making dependancy" "make -j${makeCores}"
 				runCmd "Installing compiled dependancy" "make -j ${makeCores} install DESTDIR=${BUILD_DIR}"
+
+				unset CFLAGS
+				unset CPPFLAGS
+				cd - >/den/null
 			;;
 		
 			*) logFatal "Unsupported build method [${depbuildMethod}]";;	
