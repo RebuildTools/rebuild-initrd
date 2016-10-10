@@ -34,14 +34,16 @@ GLIBC_TMP_DIR=$TEMP_DIR/glibc
 ## Task: buildInitrd
 [ -z "${INITRD_SRC}" ] && INITRD_SRC=$SCRIPTPATH/initrd_src
 
-#// Dependency format: SOURCE_URL % VERSION % DOWNLOAD_TYPE % BUILD_METHOD
+#// Dependency format: SOURCE_URL % VERSION % DOWNLOAD_TYPE % BUILD_METHOD % CONFIGURE_FLAGS
 declare -A INITRD_DEPENDENCIES=(\
 	[coreutils]="http://git.savannah.gnu.org/cgit/coreutils.git % v8.25 % git % bootstrap_configure"\
 	[bash]="http://git.savannah.gnu.org/cgit/bash.git % bash-4.4 % git % configure"\ 
 	[dhcp]="https://github.com/marschap/debian-isc-dhcp % upstream % git % configure"\
 	[iproute2]="git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2.git % v4.4.0 % git % configure"\
-	[ncurses]="http://git.savannah.gnu.org/cgit/guile-ncurses.git % guile-ncurses-1.2 % git % bootstrap_configure"\
-	[util-linux]="git://git.kernel.org/pub/scm/utils/util-linux/util-linux.git % stable/v2.28 % git % autogen_configure"
+	[ncurses]="https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.0.tar.gz % ncurses-6.0 % tar_gz % configure"\
+	[util-linux]="git://git.kernel.org/pub/scm/utils/util-linux/util-linux.git % stable/v2.28 % git % autogen_configure % --disable-makeinstall-chown"\
+	[gawk]="http://git.savannah.gnu.org/cgit/gawk.git % gawk-4.1.4 % git % configure" \
+	[grep]="http://git.savannah.gnu.org/r/grep.git % v2.26 % git % bootstrap_configure"
 )
 
 ## Task: buildKernel
@@ -216,7 +218,7 @@ buildInitrd() {
 	pushd $BUILD_DIR >/dev/null
 	mkdir -p {sys,dev,proc,etc,lib,usr/local/bin}
 	[ ! -d sbin ] && ln -s usr/local/bin bin
-	[ ! -d sbin ] && ln -s usr/local/bin sbin
+	[ ! -d sbin ] && ln -s usr/local/sbin sbin
 	[ ! -d lib64 ] && ln -s lib lib64
 	popd >/dev/null
 
@@ -229,6 +231,7 @@ buildInitrd() {
 		local depVersion=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[2]); print a[2]}')
 		local depDownloadMethod=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[3]); print a[3]}')
 		local depBuildMethod=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[4]); print a[4]}')
+		local depBuildConfigureFlags=$(echo $depString | awk '{split($0,a,"%"); print a[5]}')
 
 		logDebug "Downloading dependency [${dep} - ${depVersion}]"
 
@@ -236,10 +239,22 @@ buildInitrd() {
 		mkdir -p $DEP_DIR/$dep
 
 		case $depDownloadMethod in
-			git) runCmd "Downloading dependency with GIT method" "git clone --branch ${depVersion} ${depSource} ${TEMP_DIR}/initrd_dep/${dep}";;
+			git) 
+				runCmd "Downloading dependency with GIT method" "git clone --branch ${depVersion} ${depSource} ${DEP_DIR}/${dep}"
+			;;
+
+			tar | tar_gz)
+				mkdir -p ${DEP_DIR}/${dep}
+				runCmd "Downloading dependency with ARCHIVE method" "wget -qO ${DEP_DIR}/${dep}-download ${depSource}"
+
+				case $depDownloadMethod in
+					tar) runCmd "Extracting GZiped tarball" "tar -xC ${DEP_DIR}/${dep} $([ ! -z "${depVersion}" ] && echo "--strip-components 1") -f ${DEP_DIR}/${dep}-download $([ ! -z "${depVersion}" ] && echo $depVersion)";;
+					tar_gz) runCmd "Extracting GZiped tarball" "tar -xzC ${DEP_DIR}/${dep} $([ ! -z "${depVersion}" ] && echo "--strip-components 1") -f ${DEP_DIR}/${dep}-download $([ ! -z "${depVersion}" ] && echo $depVersion)";;
+				esac
+			;;
+				
 
 			*) logFatal "Unsupport download method [${depDownloadMethod}]";;
-			#TODO Implement other methods for downloading (e.g. TAR)
 		esac
 
 		case $depBuildMethod in
@@ -249,9 +264,12 @@ buildInitrd() {
 
 				[ "${depBuildMethod}" == "bootstrap_configure" ] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
 				[ "${depBuildMethod}" == "autogen_configure" ] && runCmd "Running \"autogen\" on dependancy sources" "./autogen.sh"
-				runCmd "Running \"configure\" on dependancy sources" "env CFLAGS=-Wunused ./configure"
+
+				export CFLAGS="-Wunused"
+				export CPPFLAGS="-P"
+				runCmd "Running \"configure\" on dependancy sources" "./configure ${depBuildConfigureFlags}"
 				runCmd "Making dependancy" "make -j${makeCores}"
-				runCmd "Install compiled dependancy" "make -j ${makeCores} install DESTDIR=${BUILD_DIR}"
+				runCmd "Installing compiled dependancy" "make -j ${makeCores} install DESTDIR=${BUILD_DIR}"
 			;;
 		
 			*) logFatal "Unsupported build method [${depbuildMethod}]";;	
@@ -274,7 +292,7 @@ buildInitrd() {
 	logDebug "Changing directories into initrd build directory" && cd $BUILD_DIR
 
 	logDebug "Build CPIO package and compressing to output file"
-	find . ! -name '.gitkeep' | cpio -o -H newc 2>/dev/null | gzip > ${OUTPUT_DIRECTORY}/initrd.gz
+	find . ! -name '.gitkeep' | cpio -o -R 0:0 -H newc 2>/dev/null | gzip > ${OUTPUT_DIRECTORY}/initrd.gz
 
 	logInfo "Finished building the RAM disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
 }
