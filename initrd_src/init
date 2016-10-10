@@ -44,7 +44,7 @@ echo 5 > /proc/sys/kernel/printk
 ### Bring up network interfaces
 
 logInfo "Bringing up network interfaces"
-for interface in $(ip a | grep -v "LOOPBACK" | grep -r "eth[0-9]" | awk '{split($2,a,":"); print a[1]}'); do
+for interface in $(ip a | grep -v "LOOPBACK" | grep -e "eth[0-9]" | awk '{split($2,a,":"); print a[1]}'); do
 	logDebug "Setting interface [${interface}] to UP"
 	ip link set dev $interface up
 done
@@ -53,7 +53,7 @@ logInfo "Waiting 5 seconds for the interfaces to activate"
 sleep 5
 
 logInfo "Attempting DHCP on active interfaces"
-for interface in $(ip a | grep -v "LOOPBACK" | grep -v "NO-CARRIER" | grep -r "eth[0-9]" | awk '{split($2,a,":"); print a[1]}'); do
+for interface in $(ip a | grep -v "LOOPBACK" | grep -v "NO-CARRIER" | grep -e "eth[0-9]" | awk '{split($2,a,":"); print a[1]}'); do
 	logDebug "Running DHCP on interface [${interface}]"
 	#udhcpc -i $interface > /dev/null
 done
