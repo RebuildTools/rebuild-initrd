@@ -219,9 +219,9 @@ buildInitrd() {
 
 	logDebug "Building directory structure"
 	pushd $BUILD_DIR >/dev/null
-	mkdir -p {sys,dev,proc,etc,lib,usr/{lib/locale,local/{bin,sbin,lib/locale}},var/db}
-	[ ! -d sbin ] && ln -s usr/local/bin bin
-	[ ! -d sbin ] && ln -s usr/local/sbin sbin
+	mkdir -p {sys,dev,proc,etc,lib,usr/lib/locale,var/db}
+	[ ! -d bin ] && ln -s usr/bin bin
+	[ ! -d sbin ] && ln -s usr/sbin sbin
 	[ ! -d lib64 ] && ln -s lib lib64
 	popd >/dev/null
 
@@ -305,13 +305,15 @@ buildInitrd() {
 	pushd $BUILD_DIR >/dev/null
 	
 	# Extract the UTF-8 character set definition
-	gunzip usr/local/share/i18n/charmaps/UTF-8.gz
+	gunzip usr/share/i18n/charmaps/UTF-8.gz
 
 	# Remove un-required charmaps
-	rm -f usr/local/share/i18n/charmaps/*.gz
+	rm -f usr/share/i18n/charmaps/*.gz
 
-	# Link the locale directory to whre it will be expected
-	ln -s usr/lib/locale usr/local/lib/locale
+	# Setup symlink for sh to bash
+	cd bin
+	ln -s bash sh
+	cd - >/dev/null
 
 	popd >/dev/null
 
@@ -322,6 +324,25 @@ buildInitrd() {
 	find . ! -name '.gitkeep' | cpio -o -R 0:0 -H newc 2>/dev/null | gzip > ${OUTPUT_DIRECTORY}/initrd.gz
 
 	logInfo "Finished building the RAM disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
+}
+
+#// Simply tasks to rebuild the 
+#// initrd image from the temp
+#// build directory. Useful when
+#// test changes without the need
+#// to run a full build.
+repackageInitrd() {
+	logInfo "Repackaging initrd from temporary build directory"
+	local BUILD_DIR=$TEMP_DIR/initrd_build
+
+	logDebug "Copying initrd sources into build directory" && \cp -rf $INITRD_SRC/* $BUILD_DIR
+
+	logDebug "Changing directories into initrd build directory" && cd $BUILD_DIR
+
+	logDebug "Build CPIO package and compressing to output file"
+	find . ! -name '.gitkeep' | cpio -o -R 0:0 -H newc 2>/dev/null | gzip > ${OUTPUT_DIRECTORY}/initrd.gz
+	
+	logInfo "Finished repackaging the RAM disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
 }
 
 #####
@@ -359,6 +380,7 @@ showHelp() {
 	printf "\t%-20s - %s\n" "showHelp" "Shows this help message"
 	printf "\t%-20s - %s\n" "buildKernel" "Downloads and compiles the Linux Kernel with the Rebuild Agent kernel configuration"
 	printf "\t%-20s - %s\n" "buildInitrd" "Packages the ram disk source (initrd_src) into the final ram disk image"
+	printf "\t%-20s - %s\n" "repackageInitrd" "Re-packaged the ram disk source (initrd_src) into the final ram disk image - Useful for quick testing"
 
 	echo -e "\n\n"
 }
