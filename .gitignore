@@ -30,9 +30,11 @@
 *.sql
 *.sqlite
 
-# Text editor swap files #
+# Editor files #
 ##########################
 *.sw[a-z]
+.idea/
+*.iml
 
 # OS generated files #
 ######################
