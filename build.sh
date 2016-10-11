@@ -25,16 +25,13 @@ popd > /dev/null
 [ -z "${OUTPUT_DIR}" ] && OUTPUT_DIRECTORY=${SCRIPTPATH}/output
 [ -z "${TEMP_DIR}" ] && TEMP_DIR=/tmp/rebuild_agent_tmp
 
-## Task: prepareStagingInitrd
-GLIBC_SRC_GIT="git://sourceware.org/git/glibc.git"
-GLIBC_TMP_DIR=${TEMP_DIR}/glibc
-[ -z "${STAGING_GLIBC_VER}" ] && STAGING_GLIBC_VER="glibc-2.24"
-[ -z "${STAGING_DIR}" ] && STAGING_DIR=${SCRIPTPATH}/initrd_staging
-
-## Task: buildInitrd
+## Task: packageInitrd
 [ -z "${INITRD_SRC}" ] && INITRD_SRC=${SCRIPTPATH}/initrd_src
+
+## Task: buildAgent
 [ -z "${INITRD_AGENT_SRC}" ] && INITRD_AGENT_SRC=${SCRIPTPATH}/agent_src
 
+## Task prepareBuild
 #// Dependency format: DEPENDENCY_NAME = SOURCE_URL % VERSION % DOWNLOAD_TYPE % BUILD_METHOD % CONFIGURE_FLAGS
 INITRD_DEPENDENCIES=(\
 	"glibc       = https://ftp.gnu.org/gnu/glibc/glibc-2.24.tar.gz % glibc-2.24 % tar_gz % configure_subdir_noflags % --disable-sanity-checks"\
@@ -65,7 +62,7 @@ KERNEL_TMP_DIR=${TEMP_DIR}/linux_kernel
 #// script.
 #//
 #// PARAMS:
-#//   $1 - The name of the function
+#//   $1 String - The name of the function
 #//
 #// RETURNS: Boolean - Returns true if the function is declared
 isAFunction() {
@@ -77,7 +74,7 @@ isAFunction() {
 #// the systems path.
 #//
 #// PARAMS:
-#//   $1 - The name of the binary
+#//   $1 String - The name of the binary
 #//
 #// RETURNS:  Boolean - Returns true if the binary exists
 binaryExists() {
@@ -94,7 +91,7 @@ binaryExists() {
 #// exist).
 #//
 #// PARAMS:
-#//   $1 - The name of the binary
+#//   $1 String - The name of the binary
 checkForBinary() {
 	logDebug "Checking for [${1}] binary"
 
@@ -110,6 +107,32 @@ checkForBinary() {
 #// script is run on
 getCpuCount() {
 	 cat /proc/cpuinfo | awk '/^processor/{print $3}' | wc -l
+}
+
+#// Looks up and copies shared
+#// objects (a.k.a libraries) for
+#// binaries into a specified root
+#// under the same folder structure.
+#//
+#// PARAMS:
+#//   $1 String - Path to binary or path to folder to search for executables
+#//   $2 String - The "root" under which the libraries should be copied to
+copyShareObjects() {
+    [ ! -d $2 ] && logFatal "The root given [${2}] isn't a directory!"
+
+    if [ -f $1 ]; then
+        for sharedLibrary in $(ldd $1 | awk '/=> \//{print $3}; /ld-linux/{print $1}'); do
+            logDebug "Copying library [${sharedLibrary}] for [${1}]"
+            mkdir -p ${2}$(dirname ${sharedLibrary})
+            \cp -f ${sharedLibrary} ${2}$(dirname ${sharedLibrary})/
+        done
+    elif [ -d $1 ]; then
+        for sharedLibrary in $(for binFile in $(find ${2} -executable -type f); do ldd ${binFile}; done | awk '/=> \//{print $3}; /ld-linux/{print $1}' | sort -u); do
+            logDebug "Copying library [${sharedLibrary}]"
+            mkdir -p ${2}$(dirname ${sharedLibrary})
+            \cp -f ${sharedLibrary} ${2}$(dirname ${sharedLibrary})/
+	    done
+    fi
 }
 
 #// Runs a shell command and captures
@@ -138,8 +161,8 @@ runCmd() {
 
                 if ! ${isGoodCode}; then
                         logPanic "Command exited with a non-zero code [${cmd_exitcode}] when \"${1}\""
-			logPanic "Command run: ${2}"
-			logFatal "Command output:\n\n${cmd_output}"
+                        logPanic "Command run: ${2}"
+                        logFatal "Command output:\n\n${cmd_output}"
                 fi
         fi  
 }
@@ -148,6 +171,10 @@ runCmd() {
 ## Script Tasks
 #####
 
+#// Compiles the Linux Kernel
+#// from source with the Kernel
+#// settings provided in directory
+#// that holds this script
 buildKernel() {
 	logInfo "Building the Linux Kernel"
 
@@ -179,12 +206,12 @@ buildKernel() {
 	logInfo "Finished building the Linux Kernel, final output file: ${OUTPUT_DIRECTORY}/linux-kernel"
 }
 
-#// Packages the intird source into
-#// gzip compressed CPIO archive that
-#// can be unpacked and executed by the
-#// Linux Kernel
-buildInitrd() {
-	logInfo "Building RAM disk image"
+#// Prepares a build directory
+#// for the initrd by setting up
+#// a temporary directory and downloading
+#// and building dependencies
+prepareBuild() {
+	logInfo "Preparing build directory for initrd with dependencies"
 
 	## Check for required tools
 	checkForBinary "cpio"
@@ -192,14 +219,7 @@ buildInitrd() {
 	checkForBinary "gcc"
 	checkForBinary "make"
 
-
-	## Check and build directories
-	logDebug "Checking for source files directory: ${INITRD_SRC}"
-	[ ! -d ${INITRD_SRC} ] && logFatal "The provided source directory [${INITRD_SRC}] doesn't exist!"
-
-	logDebug "Checking for destination directory: ${OUTPUT_DIRECTORY}"
-	[ ! -d ${OUTPUT_DIRECTORY} ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
-
+    ## Setup the directory structure
 	local BUILD_DIR=${TEMP_DIR}/initrd_build
 	if [ -d ${BUILD_DIR} ]; then
 		logWarn "Build directory exists, clearing it"
@@ -258,27 +278,27 @@ buildInitrd() {
 			;;
 				
 
-			*) logFatal "Unsupport download method [${depDownloadMethod}]";;
+			*) logFatal "Unsupported download method [${depDownloadMethod}]";;
 		esac
 
 		case ${depBuildMethod} in
 			*configure*)
-				cd ${TEMP_DIR}/initrd_dep/${dep}
+				cd ${DEP_DIR}/${dep}
 				local makeCores=$(getCpuCount)
 				local configureCmd="./configure"
 
 				[[ ${depBuildMethod} == *"subdir"* ]] && logDebug "Making sub directory for build" && mkdir -p ./rebuild_compile_dir && cd ./rebuild_compile_dir && configureCmd="../configure"
-				[[ ${depBuildMethod} == *"bootstrap"* ]] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
-				[[ ${depBuildMethod} == *"autogen"* ]] && runCmd "Running \"autogen\" on dependancy sources" "./autogen.sh"
+				[[ ${depBuildMethod} == *"bootstrap"* ]] && runCmd "Running \"bootstrap\" on dependency sources" "./bootstrap"
+				[[ ${depBuildMethod} == *"autogen"* ]] && runCmd "Running \"autogen\" on dependency sources" "./autogen.sh"
 
 				if [[ ${depBuildMethod} != *"noflags"* ]]; then
 					export CFLAGS="-Wunused"
 					export CPPFLAGS="-P"
 				fi
 
-				runCmd "Running \"configure\" on dependancy sources" "${configureCmd} --prefix=/usr ${depBuildConfigureFlags}"
-				runCmd "Making dependancy" "make -j${makeCores}"
-				runCmd "Installing compiled dependancy" "make -j${makeCores} install DESTDIR=${BUILD_DIR}"
+				runCmd "Running \"configure\" on dependency sources" "${configureCmd} --prefix=/usr ${depBuildConfigureFlags}"
+				runCmd "Making dependency" "make -j${makeCores}"
+				runCmd "Installing compiled dependency" "make -j${makeCores} install DESTDIR=${BUILD_DIR}"
 
 				unset CFLAGS
 				unset CPPFLAGS
@@ -292,17 +312,10 @@ buildInitrd() {
 	done
 
 	## Copy dependant libraries for binaries
-	for sharedLibrary in $(for binFile in $(find ${BUILD_DIR} -executable -type f); do ldd ${binFile}; done | awk '/=> \//{print $3}; /ld-linux/{print $1}' | sort -u); do
-		logDebug "Copying library [${sharedLibrary}]"
-		mkdir -p ${BUILD_DIR}$(dirname ${sharedLibrary})
-		\cp -f ${sharedLibrary} ${BUILD_DIR}$(dirname ${sharedLibrary})/
-	done
-
-	## Copy Rebuild Agent initrd sources into build directory
-	logDebug "Copying initrd sources into build directory" && \cp -rf ${INITRD_SRC}/* ${BUILD_DIR}
+    copyShareObjects "${BUILD_DIR}" "${BUILD_DIR}"
 
 	## Run final tasks on the file before packaging
-	logDebug "Running pre-build tasks on files"
+	logDebug "Running post-build tasks on files"
 	pushd ${BUILD_DIR} >/dev/null
 	
 	# Extract the UTF-8 character set definition
@@ -318,23 +331,51 @@ buildInitrd() {
 
 	popd >/dev/null
 
-	## Package initrd
-	logDebug "Changing directories into initrd build directory" && cd ${BUILD_DIR}
-
-	logDebug "Build CPIO package and compressing to output file"
-	find . ! -name '.gitkeep' | cpio -o -R 0:0 -H newc 2>/dev/null | gzip > ${OUTPUT_DIRECTORY}/initrd.gz
-
-	logInfo "Finished building the RAM disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
+	logInfo "Finished preparing build directory"
 }
 
-#// Simply tasks to rebuild the 
-#// initrd image from the temp
-#// build directory. Useful when
-#// test changes without the need
-#// to run a full build.
-repackageInitrd() {
-	logInfo "Repackaging initrd from temporary build directory"
+#// Compiles the go source
+#// that makes the Rebuild Agent
+#// and installs the binary and libraries
+#// into the build directory
+buildAgent() {
+	logInfo "Building and installing Rebuild Agent"
+
+    checkForBinary "go"
+    checkForBinary "glide"
+
+    logDebug "Checking for source files directory: ${INITRD_AGENT_SRC}"
+	[ ! -d ${INITRD_AGENT_SRC} ] && logFatal "The provided source directory [${INITRD_AGENT_SRC}] doesn't exist!"
+
+    local BUILD_DIR=${TEMP_DIR}/initrd_build
+    logDebug "Checking for build directory: ${BUILD_DIR}"
+	[ ! -d ${BUILD_DIR} ] && logFatal "The output directory [${BUILD_DIR}] doesn't exist, run \"prepareBuild\""
+
+	pushd ${INITRD_AGENT_SRC} >/dev/null
+	glide install
+	go build -o ${BUILD_DIR}/bin/rebuild-agent rebuild-agent.go
+	popd >/dev/null
+
+    copyShareObjects "${BUILD_DIR}/bin/rebuild-agent" "${BUILD_DIR}"
+
+    logInfo "Finished building and installing the Rebuild Agent"
+}
+
+#// Builds the final initrd from
+#// all the files in the temporary
+#// build directory.
+packageInitrd() {
+	logInfo "Packaging initrd from build directory"
+
 	local BUILD_DIR=${TEMP_DIR}/initrd_build
+    logDebug "Checking for build directory: ${BUILD_DIR}"
+	[ ! -d ${BUILD_DIR} ] && logFatal "The output directory [${BUILD_DIR}] doesn't exist, run \"prepareBuild\""
+
+	logDebug "Checking for source files directory: ${INITRD_SRC}"
+	[ ! -d ${INITRD_SRC} ] && logFatal "The provided source directory [${INITRD_SRC}] doesn't exist!"
+
+	logDebug "Checking for destination directory: ${OUTPUT_DIRECTORY}"
+	[ ! -d ${OUTPUT_DIRECTORY} ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
 
 	logDebug "Copying initrd sources into build directory" && \cp -rf ${INITRD_SRC}/* ${BUILD_DIR}
 
@@ -343,7 +384,7 @@ repackageInitrd() {
 	logDebug "Build CPIO package and compressing to output file"
 	find . ! -name '.gitkeep' | cpio -o -R 0:0 -H newc 2>/dev/null | gzip > ${OUTPUT_DIRECTORY}/initrd.gz
 	
-	logInfo "Finished repackaging the RAM disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
+	logInfo "Finished packaging the RAM disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
 }
 
 #####
@@ -373,15 +414,19 @@ showHelp() {
 	printf "\t%-20s - %s\n" "KERNEL_BUILD_CONFIG" "Defines the path to the Linux Kernel build config (Default: ${SCRIPTPATH}/linux-kernel.config)"
 	printf "\t%-20s - %s\n" "KERNEL_VERSION_TAG" "Defines the git tag of desired Linux Kernel version (Default: v4.8)"
 
-	printf "\n\t=== TASK: %-10s ===\n" "buildInitrd"
+    printf "\n\t=== TASK: %-10s ===\n" "buildAgent"
+	printf "\t%-20s - %s\n" "INITRD_AGENT_SRC" "Defines the location of the agent source files (Default: ${SCRIPTPATH}/agent_src)"
+
+	printf "\n\t=== TASK: %-10s ===\n" "packageInitrd"
 	printf "\t%-20s - %s\n" "INITRD_SRC" "Defines the location of the ram disk source files (Default: ${SCRIPTPATH}/initrd_src)"
 
 
 	echo -e "\nTasks:"
 	printf "\t%-20s - %s\n" "showHelp" "Shows this help message"
 	printf "\t%-20s - %s\n" "buildKernel" "Downloads and compiles the Linux Kernel with the Rebuild Agent kernel configuration"
-	printf "\t%-20s - %s\n" "buildInitrd" "Packages the ram disk source (initrd_src) into the final ram disk image"
-	printf "\t%-20s - %s\n" "repackageInitrd" "Re-packaged the ram disk source (initrd_src) into the final ram disk image - Useful for quick testing"
+	printf "\t%-20s - %s\n" "prepareBuild" "Prepares a build directory and installs dependencies to it"
+	printf "\t%-20s - %s\n" "buildAgent" "Compiles the Rebuild Agent sources and installs it into the build directory"
+	printf "\t%-20s - %s\n" "packageInitrd" "Packages the ram disk sources into the final ram disk image"
 
 	echo -e "\n\n"
 }
