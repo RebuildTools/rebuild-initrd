@@ -12,7 +12,7 @@
 # Author: Liam Haworth <liam@haworth.id.au>
 #
 
-tmux new-session -d -s rebuild 'exec bash' #TODO This should launch "rebuild-agent banner"
+tmux new-session -d -s rebuild 'exec /bin/rebuild-agent banner'
 tmux select-window -t rebuild:0
 tmux split-window -v 'exec bash' #TODO This should launch "rebuild-agent profiler"
 tmux -2 attach-session -t rebuild
