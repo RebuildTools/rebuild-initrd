@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Rebuild Agent - Tmux Screen Setup Script
+# ========================================
+#
+# The Rebuild Agent leverages tmux to present
+# a split screen on the system it is profiling,
+# the top virtical split is for displaying the
+# Rebuild Logo and the bottom split is for showing
+# logs and the agent prompt
+#
+# Author: Liam Haworth <liam@haworth.id.au>
+#
+
+tmux new-session -d -s rebuild 'exec bash' #TODO This should launch "rebuild-agent banner"
+tmux select-window -t rebuild:0
+tmux split-window -v 'exec bash' #TODO This should launch "rebuild-agent profiler"
+tmux -2 attach-session -t rebuild

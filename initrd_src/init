@@ -12,7 +12,7 @@
 #
 
 # Set the PATH for the system
-export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH=/bin:/sbin:/usr/local/bin:/usr/local/sbin
 
 ### Load in helper functions
 . /lib/rebuild/functions
@@ -70,5 +70,4 @@ done
 ### Drop down into the agent
 
 logInfo "Starting the Rebuild Agent"
-#exec /bin/rebuild-agent
-setsid sh -c 'exec bash </dev/tty1 >/dev/tty1 2>&1'
+setsid sh -c 'exec bash -c "script -qc /lib/rebuild/tmux-setup-run /dev/null" </dev/tty1 >/dev/tty1 2>&1'
