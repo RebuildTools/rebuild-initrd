@@ -10,6 +10,10 @@ package main
 
 import (
 	"os"
+	"os/signal"
+	"syscall"
+	"fmt"
+	"time"
 	"strconv"
 	"github.com/Sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
@@ -43,5 +47,24 @@ func init() {
 }
 
 func main() {
-	logger.Info("Rebuild Agent initialized, collecting system information")
+	switch os.Args[1] {
+	case "banner":
+		showBanner()
+
+	default:
+		logger.Panic(fmt.Sprintf("Unknown command: %s", os.Args[1]))
+	}
+}
+
+func showBanner() {
+	quitHandle := make(chan os.Signal, 1)
+	signal.Notify(quitHandle, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-quitHandle
+		logger.Debug("The banner cannot be closed, if you really need to, please use SIGKILL")
+	}()
+
+	fmt.Println("Put some banner here")
+
+	for { time.Sleep(10 * time.Second) }
 }
