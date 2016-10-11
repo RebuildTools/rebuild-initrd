@@ -352,8 +352,8 @@ buildAgent() {
 	[ ! -d ${BUILD_DIR} ] && logFatal "The output directory [${BUILD_DIR}] doesn't exist, run \"prepareBuild\""
 
 	pushd ${INITRD_AGENT_SRC} >/dev/null
-	glide install
-	go build -o ${BUILD_DIR}/bin/rebuild-agent rebuild-agent.go
+	runCmd "Downloading golang agent dependencies" "glide install"
+	runCmd "Building golang agent" "go build -o ${BUILD_DIR}/bin/rebuild-agent rebuild-agent.go"
 	popd >/dev/null
 
     copyShareObjects "${BUILD_DIR}/bin/rebuild-agent" "${BUILD_DIR}"
