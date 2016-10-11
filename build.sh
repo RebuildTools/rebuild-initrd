@@ -22,17 +22,18 @@ SCRIPTPATH=`pwd`
 popd > /dev/null
 
 ## Global
-[ -z "${OUTPUT_DIR}" ] && OUTPUT_DIRECTORY=$SCRIPTPATH/output
+[ -z "${OUTPUT_DIR}" ] && OUTPUT_DIRECTORY=${SCRIPTPATH}/output
 [ -z "${TEMP_DIR}" ] && TEMP_DIR=/tmp/rebuild_agent_tmp
 
 ## Task: prepareStagingInitrd
 GLIBC_SRC_GIT="git://sourceware.org/git/glibc.git"
-GLIBC_TMP_DIR=$TEMP_DIR/glibc
+GLIBC_TMP_DIR=${TEMP_DIR}/glibc
 [ -z "${STAGING_GLIBC_VER}" ] && STAGING_GLIBC_VER="glibc-2.24"
-[ -z "${STAGING_DIR}" ] && STAGING_DIR=$SCRIPTPATH/initrd_staging
+[ -z "${STAGING_DIR}" ] && STAGING_DIR=${SCRIPTPATH}/initrd_staging
 
 ## Task: buildInitrd
-[ -z "${INITRD_SRC}" ] && INITRD_SRC=$SCRIPTPATH/initrd_src
+[ -z "${INITRD_SRC}" ] && INITRD_SRC=${SCRIPTPATH}/initrd_src
+[ -z "${INITRD_AGENT_SRC}" ] && INITRD_AGENT_SRC=${SCRIPTPATH}/agent_src
 
 #// Dependency format: DEPENDENCY_NAME = SOURCE_URL % VERSION % DOWNLOAD_TYPE % BUILD_METHOD % CONFIGURE_FLAGS
 INITRD_DEPENDENCIES=(\
@@ -51,8 +52,8 @@ INITRD_DEPENDENCIES=(\
 
 ## Task: buildKernel
 KERNEL_SRC_GIT="https://github.com/torvalds/linux.git"
-KERNEL_TMP_DIR=$TEMP_DIR/linux_kernel
-[ -z "${KERNEL_BUILD_CONFIG}" ] && KERNEL_BUILD_CONFIG=$SCRIPTPATH/linux-kernel.config
+KERNEL_TMP_DIR=${TEMP_DIR}/linux_kernel
+[ -z "${KERNEL_BUILD_CONFIG}" ] && KERNEL_BUILD_CONFIG=${SCRIPTPATH}/linux-kernel.config
 [ -z "${KERNEL_VERSION_TAG}" ] && KERNEL_VERSION_TAG="v4.8"
 
 #####
@@ -126,17 +127,17 @@ runCmd() {
         local cmd_output; cmd_output=$($2 2>&1)
         local cmd_exitcode=$?
 
-        if [ $cmd_exitcode -gt 0 ]; then
+        if [ ${cmd_exitcode} -gt 0 ]; then
                 local isGoodCode=false
 
                 if [ ! -z "${3}" ]; then
                         for allowedCode in $(echo "${3}" | sed 's/,/ /g'); do
-                                [ $allowedCode == $cmd_exitcode ] && isGoodCode=true
+                                [ ${allowedCode} == ${cmd_exitcode} ] && isGoodCode=true
                         done
                 fi
 
-                if ! $isGoodCode; then
-                        logPanic "Command exited with a non-zero code [$cmd_exitcode] when \"${1}\""
+                if ! ${isGoodCode}; then
+                        logPanic "Command exited with a non-zero code [${cmd_exitcode}] when \"${1}\""
 			logPanic "Command run: ${2}"
 			logFatal "Command output:\n\n${cmd_output}"
                 fi
@@ -153,15 +154,15 @@ buildKernel() {
 	checkForBinary "git"
 	checkForBinary "make"
 	
-	[ -d $KERNEL_TMP_DIR ] && logWarn "Temporary build directory for kernel exists, clearing it" && rm -rf $KERNEL_TMP_DIR
+	[ -d ${KERNEL_TMP_DIR} ] && logWarn "Temporary build directory for kernel exists, clearing it" && rm -rf ${KERNEL_TMP_DIR}
 
 	runCmd "Cloning Linux Kernel source" "git clone --branch ${KERNEL_VERSION_TAG} --depth 1 ${KERNEL_SRC_GIT} ${KERNEL_TMP_DIR}"
 
 	logDebug "Copying kernel build config to source directory"
-	\cp -f $KERNEL_BUILD_CONFIG $KERNEL_TMP_DIR/.config
+	\cp -f ${KERNEL_BUILD_CONFIG} ${KERNEL_TMP_DIR}/.config
 
 	logDebug "Changing directory to source"
-	cd $KERNEL_TMP_DIR
+	cd ${KERNEL_TMP_DIR}
 
 	local buildCoreUse=$(getCpuCount)
 	runCmd "Compiling kernel with [${buildCoreUse}] CPUs" "make -j${buildCoreUse}"
@@ -170,10 +171,10 @@ buildKernel() {
 	cd - >/dev/null
 
 	logDebug "Checking for destination directory: ${OUTPUT_DIRECTORY}"
-	[ ! -d $OUTPUT_DIRECTORY ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
+	[ ! -d ${OUTPUT_DIRECTORY} ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
 
 	logDebug "Copying compiled kernel to output directory"
-	\cp -f $KERNEL_TMP_DIR/arch/x86/boot/bzImage $OUTPUT_DIRECTORY/linux-kernel
+	\cp -f ${KERNEL_TMP_DIR}/arch/x86/boot/bzImage ${OUTPUT_DIRECTORY}/linux-kernel
 
 	logInfo "Finished building the Linux Kernel, final output file: ${OUTPUT_DIRECTORY}/linux-kernel"
 }
@@ -194,32 +195,32 @@ buildInitrd() {
 
 	## Check and build directories
 	logDebug "Checking for source files directory: ${INITRD_SRC}"
-	[ ! -d $INITRD_SRC ] && logFatal "The provided source directory [${INITRD_SRC}] doesn't exist!"
+	[ ! -d ${INITRD_SRC} ] && logFatal "The provided source directory [${INITRD_SRC}] doesn't exist!"
 
 	logDebug "Checking for destination directory: ${OUTPUT_DIRECTORY}"
-	[ ! -d $OUTPUT_DIRECTORY ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
+	[ ! -d ${OUTPUT_DIRECTORY} ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
 
-	local BUILD_DIR=$TEMP_DIR/initrd_build
-	if [ -d $BUILD_DIR ]; then
+	local BUILD_DIR=${TEMP_DIR}/initrd_build
+	if [ -d ${BUILD_DIR} ]; then
 		logWarn "Build directory exists, clearing it"
-		rm -rf $BUILD_DIR
+		rm -rf ${BUILD_DIR}
 	fi 
 	
 	logDebug "Making temporary build directory"
-	mkdir -p $BUILD_DIR
+	mkdir -p ${BUILD_DIR}
 	
-	local DEP_DIR=$TEMP_DIR/initrd_dep
-	if [ -d $DEP_DIR ]; then
+	local DEP_DIR=${TEMP_DIR}/initrd_dep
+	if [ -d ${DEP_DIR} ]; then
 		logWarn "Dependencies directory exists, clearing it"
-		rm -rf $DEP_DIR
+		rm -rf ${DEP_DIR}
 	fi
 	
 	logDebug "Making temporary dependencies directory"
-	mkdir -p $DEP_DIR
+	mkdir -p ${DEP_DIR}
 
 	logDebug "Building directory structure"
-	pushd $BUILD_DIR >/dev/null
-	mkdir -p {sys,dev,proc,etc,lib,usr/lib/locale,var/db}
+	pushd ${BUILD_DIR} >/dev/null
+	mkdir -p sys dev proc etc lib usr/lib/locale var/db
 	[ ! -d bin ] && ln -s usr/bin bin
 	[ ! -d sbin ] && ln -s usr/sbin sbin
 	[ ! -d lib64 ] && ln -s lib lib64
@@ -229,19 +230,19 @@ buildInitrd() {
 	## Build required third-party binaries
 	logDebug "Downloading and building dependencies"
 	for depString in "${INITRD_DEPENDENCIES[@]}"; do
-		local dep=$(echo $depString | awk '{split($0,a,"="); gsub(/ /, "", a[1]); print a[1]}')
-		local depSource=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[1]); print a[1]}')
-		local depVersion=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[2]); print a[2]}')
-		local depDownloadMethod=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[3]); print a[3]}')
-		local depBuildMethod=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[4]); print a[4]}')
-		local depBuildConfigureFlags=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); print a[5]}')
+		local dep=$(echo ${depString} | awk '{split($0,a,"="); gsub(/ /, "", a[1]); print a[1]}')
+		local depSource=$(echo ${depString} | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[1]); print a[1]}')
+		local depVersion=$(echo ${depString} | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[2]); print a[2]}')
+		local depDownloadMethod=$(echo ${depString} | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[3]); print a[3]}')
+		local depBuildMethod=$(echo ${depString} | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[4]); print a[4]}')
+		local depBuildConfigureFlags=$(echo ${depString} | awk '{split($0,b,"="); split(b[2],a,"%"); print a[5]}')
 
 		logDebug "Downloading dependency [${dep} - ${depVersion}]"
 
 		logDebug "Making temporary directory for dependency"
-		mkdir -p $DEP_DIR/$dep
+		mkdir -p ${DEP_DIR}/${dep}
 
-		case $depDownloadMethod in
+		case ${depDownloadMethod} in
 			git) 
 				runCmd "Downloading dependency with GIT method" "git clone --branch ${depVersion} ${depSource} ${DEP_DIR}/${dep}"
 			;;
@@ -250,9 +251,9 @@ buildInitrd() {
 				mkdir -p ${DEP_DIR}/${dep}
 				runCmd "Downloading dependency with ARCHIVE method" "wget -qO ${DEP_DIR}/${dep}-download ${depSource}"
 
-				case $depDownloadMethod in
-					tar) runCmd "Extracting GZiped tarball" "tar -xC ${DEP_DIR}/${dep} $([ ! -z "${depVersion}" ] && echo "--strip-components 1") -f ${DEP_DIR}/${dep}-download $([ ! -z "${depVersion}" ] && echo $depVersion)";;
-					tar_gz) runCmd "Extracting GZiped tarball" "tar -xzC ${DEP_DIR}/${dep} $([ ! -z "${depVersion}" ] && echo "--strip-components 1") -f ${DEP_DIR}/${dep}-download $([ ! -z "${depVersion}" ] && echo $depVersion)";;
+				case ${depDownloadMethod} in
+					tar) runCmd "Extracting GZiped tarball" "tar -xC ${DEP_DIR}/${dep} $([ ! -z "${depVersion}" ] && echo "--strip-components 1") -f ${DEP_DIR}/${dep}-download $([ ! -z "${depVersion}" ] && echo ${depVersion})";;
+					tar_gz) runCmd "Extracting GZiped tarball" "tar -xzC ${DEP_DIR}/${dep} $([ ! -z "${depVersion}" ] && echo "--strip-components 1") -f ${DEP_DIR}/${dep}-download $([ ! -z "${depVersion}" ] && echo ${depVersion})";;
 				esac
 			;;
 				
@@ -260,17 +261,17 @@ buildInitrd() {
 			*) logFatal "Unsupport download method [${depDownloadMethod}]";;
 		esac
 
-		case $depBuildMethod in
+		case ${depBuildMethod} in
 			*configure*)
 				cd ${TEMP_DIR}/initrd_dep/${dep}
 				local makeCores=$(getCpuCount)
 				local configureCmd="./configure"
 
-				[[ $depBuildMethod == *"subdir"* ]] && logDebug "Making sub directory for build" && mkdir -p ./rebuild_compile_dir && cd ./rebuild_compile_dir && configureCmd="../configure"
-				[[ $depBuildMethod == *"bootstrap"* ]] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
-				[[ $depBuildMethod == *"autogen"* ]] && runCmd "Running \"autogen\" on dependancy sources" "./autogen.sh"
+				[[ ${depBuildMethod} == *"subdir"* ]] && logDebug "Making sub directory for build" && mkdir -p ./rebuild_compile_dir && cd ./rebuild_compile_dir && configureCmd="../configure"
+				[[ ${depBuildMethod} == *"bootstrap"* ]] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
+				[[ ${depBuildMethod} == *"autogen"* ]] && runCmd "Running \"autogen\" on dependancy sources" "./autogen.sh"
 
-				if [[ $depBuildMethod != *"noflags"* ]]; then 
+				if [[ ${depBuildMethod} != *"noflags"* ]]; then
 					export CFLAGS="-Wunused"
 					export CPPFLAGS="-P"
 				fi
@@ -284,25 +285,25 @@ buildInitrd() {
 				cd - >/dev/null
 			;;
 		
-			*) logFatal "Unsupported build method [${depbuildMethod}]";;	
+			*) logFatal "Unsupported build method [${depBuildMethod}]";;
 			#TODO Implement other methods for building 
 		esac
 
 	done
 
 	## Copy dependant libraries for binaries
-	for sharedLibrary in $(for binFile in $(find $BUILD_DIR -executable -type f); do ldd $binFile; done | awk '/=> \//{print $3}; /ld-linux/{print $1}' | sort -u); do
+	for sharedLibrary in $(for binFile in $(find ${BUILD_DIR} -executable -type f); do ldd ${binFile}; done | awk '/=> \//{print $3}; /ld-linux/{print $1}' | sort -u); do
 		logDebug "Copying library [${sharedLibrary}]"
-		mkdir -p $BUILD_DIR$(dirname $sharedLibrary)
-		\cp -f $sharedLibrary $BUILD_DIR$(dirname $sharedLibrary)/
+		mkdir -p ${BUILD_DIR}$(dirname ${sharedLibrary})
+		\cp -f ${sharedLibrary} ${BUILD_DIR}$(dirname ${sharedLibrary})/
 	done
 
 	## Copy Rebuild Agent initrd sources into build directory
-	logDebug "Copying initrd sources into build directory" && \cp -rf $INITRD_SRC/* $BUILD_DIR
+	logDebug "Copying initrd sources into build directory" && \cp -rf ${INITRD_SRC}/* ${BUILD_DIR}
 
 	## Run final tasks on the file before packaging
 	logDebug "Running pre-build tasks on files"
-	pushd $BUILD_DIR >/dev/null
+	pushd ${BUILD_DIR} >/dev/null
 	
 	# Extract the UTF-8 character set definition
 	gunzip usr/share/i18n/charmaps/UTF-8.gz
@@ -318,7 +319,7 @@ buildInitrd() {
 	popd >/dev/null
 
 	## Package initrd
-	logDebug "Changing directories into initrd build directory" && cd $BUILD_DIR
+	logDebug "Changing directories into initrd build directory" && cd ${BUILD_DIR}
 
 	logDebug "Build CPIO package and compressing to output file"
 	find . ! -name '.gitkeep' | cpio -o -R 0:0 -H newc 2>/dev/null | gzip > ${OUTPUT_DIRECTORY}/initrd.gz
@@ -333,11 +334,11 @@ buildInitrd() {
 #// to run a full build.
 repackageInitrd() {
 	logInfo "Repackaging initrd from temporary build directory"
-	local BUILD_DIR=$TEMP_DIR/initrd_build
+	local BUILD_DIR=${TEMP_DIR}/initrd_build
 
-	logDebug "Copying initrd sources into build directory" && \cp -rf $INITRD_SRC/* $BUILD_DIR
+	logDebug "Copying initrd sources into build directory" && \cp -rf ${INITRD_SRC}/* ${BUILD_DIR}
 
-	logDebug "Changing directories into initrd build directory" && cd $BUILD_DIR
+	logDebug "Changing directories into initrd build directory" && cd ${BUILD_DIR}
 
 	logDebug "Build CPIO package and compressing to output file"
 	find . ! -name '.gitkeep' | cpio -o -R 0:0 -H newc 2>/dev/null | gzip > ${OUTPUT_DIRECTORY}/initrd.gz
@@ -408,7 +409,7 @@ else
 
 	for task in $@; do
 		logDebug "Running task [${task}]"
-		$task
+		${task}
 	done
 
 	logInfo "All tasks completed successfully!"
