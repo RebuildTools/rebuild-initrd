@@ -41,6 +41,14 @@ mount -t devtmpfs none /dev
 ### Change Kernel logging level to quite it
 echo 5 > /proc/sys/kernel/printk
 
+### Run pre-start tasks
+
+#TODO Make this customizable with Kernel boot parameters
+logInfo "Generating and changing locale to en_US.UTF-8"
+localedef -c -i en_US -f UTF-8 en_US.UTF-8
+export LANG="en_US.UTF-8"
+
+
 ### Bring up network interfaces
 
 logInfo "Bringing up network interfaces"
@@ -63,4 +71,4 @@ done
 
 logInfo "Starting the Rebuild Agent"
 #exec /bin/rebuild-agent
-exec /bin/bash
+setsid sh -c 'exec bash </dev/tty1 >/dev/tty1 2>&1'

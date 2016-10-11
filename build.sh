@@ -34,18 +34,19 @@ GLIBC_TMP_DIR=$TEMP_DIR/glibc
 ## Task: buildInitrd
 [ -z "${INITRD_SRC}" ] && INITRD_SRC=$SCRIPTPATH/initrd_src
 
-#// Dependency format: SOURCE_URL % VERSION % DOWNLOAD_TYPE % BUILD_METHOD % CONFIGURE_FLAGS
-declare -A INITRD_DEPENDENCIES=(\
-	[coreutils]="http://git.savannah.gnu.org/cgit/coreutils.git % v8.25 % git % bootstrap_configure"\
-	[bash]="http://git.savannah.gnu.org/cgit/bash.git % bash-4.4 % git % configure"\ 
-	[dhcp]="https://github.com/marschap/debian-isc-dhcp % upstream % git % configure"\
-	[iproute2]="git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2.git % v4.4.0 % git % configure"\
-	[ncurses]="https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.0.tar.gz % ncurses-6.0 % tar_gz % configure"\
-	[util-linux]="git://git.kernel.org/pub/scm/utils/util-linux/util-linux.git % stable/v2.28 % git % autogen_configure % --disable-makeinstall-chown"\
-	[gawk]="http://git.savannah.gnu.org/cgit/gawk.git % gawk-4.1.4 % git % configure" \
-	[grep]="http://git.savannah.gnu.org/r/grep.git % v2.26 % git % bootstrap_configure" \
-	[tmux]="https://github.com/tmux/tmux.git % 2.3 % git % autogen_configure" \
-	[glibc]="http://sourceware.org/git/glibc.git % glibc-2.24 % git % configure_subdir_noflags % --disable-sanity-checks"
+#// Dependency format: DEPENDENCY_NAME = SOURCE_URL % VERSION % DOWNLOAD_TYPE % BUILD_METHOD % CONFIGURE_FLAGS
+INITRD_DEPENDENCIES=(\
+	"glibc       = https://ftp.gnu.org/gnu/glibc/glibc-2.24.tar.gz % glibc-2.24 % tar_gz % configure_subdir_noflags % --disable-sanity-checks"\
+	"libevent    = https://github.com/libevent/libevent % master % git % autogen_configure"\
+	"coreutils   = http://git.savannah.gnu.org/cgit/coreutils.git % v8.25 % git % bootstrap_configure"\
+	"bash        = http://git.savannah.gnu.org/cgit/bash.git % bash-4.4 % git % configure"\ 
+	"dhcp        = https://github.com/marschap/debian-isc-dhcp % upstream % git % configure"\
+	"iproute2    = git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2.git % v4.4.0 % git % configure"\
+	"ncurses     = https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.0.tar.gz % ncurses-6.0 % tar_gz % configure"\
+	"util-linux  = git://git.kernel.org/pub/scm/utils/util-linux/util-linux.git % stable/v2.28 % git % autogen_configure % --disable-makeinstall-chown"\
+	"gawk        = http://git.savannah.gnu.org/cgit/gawk.git % gawk-4.1.4 % git % configure" \
+	"grep        = http://git.savannah.gnu.org/r/grep.git % v2.26 % git % bootstrap_configure" \
+	"tmux        = https://github.com/tmux/tmux.git % 2.3 % git % autogen_configure" \
 )
 
 ## Task: buildKernel
@@ -218,7 +219,7 @@ buildInitrd() {
 
 	logDebug "Building directory structure"
 	pushd $BUILD_DIR >/dev/null
-	mkdir -p {sys,dev,proc,etc,lib,usr/local/{bin,sbin},var/db}
+	mkdir -p {sys,dev,proc,etc,lib,usr/{lib/locale,local/{bin,sbin,lib/locale}},var/db}
 	[ ! -d sbin ] && ln -s usr/local/bin bin
 	[ ! -d sbin ] && ln -s usr/local/sbin sbin
 	[ ! -d lib64 ] && ln -s lib lib64
@@ -227,13 +228,13 @@ buildInitrd() {
 
 	## Build required third-party binaries
 	logDebug "Downloading and building dependencies"
-	for dep in ${!INITRD_DEPENDENCIES[@]}; do
-		local depString=${INITRD_DEPENDENCIES[$dep]}
-		local depSource=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[1]); print a[1]}')
-		local depVersion=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[2]); print a[2]}')
-		local depDownloadMethod=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[3]); print a[3]}')
-		local depBuildMethod=$(echo $depString | awk '{split($0,a,"%"); gsub(/ /, "", a[4]); print a[4]}')
-		local depBuildConfigureFlags=$(echo $depString | awk '{split($0,a,"%"); print a[5]}')
+	for depString in "${INITRD_DEPENDENCIES[@]}"; do
+		local dep=$(echo $depString | awk '{split($0,a,"="); gsub(/ /, "", a[1]); print a[1]}')
+		local depSource=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[1]); print a[1]}')
+		local depVersion=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[2]); print a[2]}')
+		local depDownloadMethod=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[3]); print a[3]}')
+		local depBuildMethod=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); gsub(/ /, "", a[4]); print a[4]}')
+		local depBuildConfigureFlags=$(echo $depString | awk '{split($0,b,"="); split(b[2],a,"%"); print a[5]}')
 
 		logDebug "Downloading dependency [${dep} - ${depVersion}]"
 
@@ -263,23 +264,24 @@ buildInitrd() {
 			*configure*)
 				cd ${TEMP_DIR}/initrd_dep/${dep}
 				local makeCores=$(getCpuCount)
+				local configureCmd="./configure"
 
-				[[ "${depBuildMethod}" == *"subdir"* ]] && logDebug "Making sub directory for build" && mkdir -p ./rebuild_compile_dir && cd ./rebuild_compile_dir
-				[[ "${depBuildMethod}" == *"bootstrap"* ]] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
-				[[ "${depBuildMethod}" == *"autogen"* ]] && runCmd "Running \"autogen\" on dependancy sources" "./autogen.sh"
+				[[ $depBuildMethod == *"subdir"* ]] && logDebug "Making sub directory for build" && mkdir -p ./rebuild_compile_dir && cd ./rebuild_compile_dir && configureCmd="../configure"
+				[[ $depBuildMethod == *"bootstrap"* ]] && runCmd "Running \"bootstrap\" on dependancy sources" "./bootstrap"
+				[[ $depBuildMethod == *"autogen"* ]] && runCmd "Running \"autogen\" on dependancy sources" "./autogen.sh"
 
-				if [[ "${depBuildMethod}" != *"noflags"* ]]; then 
+				if [[ $depBuildMethod != *"noflags"* ]]; then 
 					export CFLAGS="-Wunused"
 					export CPPFLAGS="-P"
 				fi
 
-				runCmd "Running \"configure\" on dependancy sources" "./configure ${depBuildConfigureFlags}"
+				runCmd "Running \"configure\" on dependancy sources" "${configureCmd} --prefix=/usr ${depBuildConfigureFlags}"
 				runCmd "Making dependancy" "make -j${makeCores}"
-				runCmd "Installing compiled dependancy" "make -j ${makeCores} install DESTDIR=${BUILD_DIR}"
+				runCmd "Installing compiled dependancy" "make -j${makeCores} install DESTDIR=${BUILD_DIR}"
 
 				unset CFLAGS
 				unset CPPFLAGS
-				cd - >/den/null
+				cd - >/dev/null
 			;;
 		
 			*) logFatal "Unsupported build method [${depbuildMethod}]";;	
@@ -297,6 +299,21 @@ buildInitrd() {
 
 	## Copy Rebuild Agent initrd sources into build directory
 	logDebug "Copying initrd sources into build directory" && \cp -rf $INITRD_SRC/* $BUILD_DIR
+
+	## Run final tasks on the file before packaging
+	logDebug "Running pre-build tasks on files"
+	pushd $BUILD_DIR >/dev/null
+	
+	# Extract the UTF-8 character set definition
+	gunzip usr/local/share/i18n/charmaps/UTF-8.gz
+
+	# Remove un-required charmaps
+	rm -f usr/local/share/i18n/charmaps/*.gz
+
+	# Link the locale directory to whre it will be expected
+	ln -s usr/lib/locale usr/local/lib/locale
+
+	popd >/dev/null
 
 	## Package initrd
 	logDebug "Changing directories into initrd build directory" && cd $BUILD_DIR
