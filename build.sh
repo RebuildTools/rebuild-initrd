@@ -387,6 +387,15 @@ packageInitrd() {
 	logInfo "Finished packaging the RAM disk, final output file: ${OUTPUT_DIRECTORY}/initrd.gz"
 }
 
+#// A dumy task that runs
+#// three subtasks to build
+#// the initrd
+buildInitrd() {
+	prepareBuild
+	buildAgent
+	packageInitrd
+}
+
 #####
 ## Script Help Message
 #####
@@ -424,9 +433,10 @@ showHelp() {
 	echo -e "\nTasks:"
 	printf "\t%-20s - %s\n" "showHelp" "Shows this help message"
 	printf "\t%-20s - %s\n" "buildKernel" "Downloads and compiles the Linux Kernel with the Rebuild Agent kernel configuration"
-	printf "\t%-20s - %s\n" "prepareBuild" "Prepares a build directory and installs dependencies to it"
-	printf "\t%-20s - %s\n" "buildAgent" "Compiles the Rebuild Agent sources and installs it into the build directory"
-	printf "\t%-20s - %s\n" "packageInitrd" "Packages the ram disk sources into the final ram disk image"
+	printf "\t%-20s - %s\n" "* prepareBuild" "Prepares a build directory and installs dependencies to it"
+	printf "\t%-20s - %s\n" "* buildAgent" "Compiles the Rebuild Agent sources and installs it into the build directory"
+	printf "\t%-20s - %s\n" "* packageInitrd" "Packages the ram disk sources into the final ram disk image"
+	printf "\t%-20s - %s\n" "buildInitrd" "Runs the tasks marked with \"*\""
 
 	echo -e "\n\n"
 }
