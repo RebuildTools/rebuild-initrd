@@ -19,6 +19,7 @@
 
 pushd `dirname $0` > /dev/null
 SCRIPTPATH=`pwd`
+VERSION=`git describe --tags --abbrev=5`
 popd > /dev/null
 
 ## Global
@@ -369,6 +370,7 @@ buildAgent() {
 	cd - >/dev/null
 	export GOPATH=${OLD_GOPATH}
 
+	logDebug "Copying shared libraries"
 	copyShareObjects "${BUILD_DIR}/bin/rebuild-agent" "${BUILD_DIR}"
 
 	logInfo "Finished building and installing the Rebuild Agent"
@@ -391,6 +393,9 @@ packageInitrd() {
 	[ ! -d ${OUTPUT_DIRECTORY} ] && logWarn "The output directory [${OUTPUT_DIRECTORY}] doesn't exist, making it" && mkdir -p ${OUTPUT_DIRECTORY}
 
 	logDebug "Copying initrd sources into build directory" && \cp -rf ${INITRD_SRC}/* ${BUILD_DIR}
+
+	logDebug "Writing initrd release file to build directory"
+	echo ${VERSION} > ${BUILD_DIR}/lib/rebuild/initrd-release
 
 	logDebug "Changing directories into initrd build directory" && cd ${BUILD_DIR}
 
@@ -459,6 +464,7 @@ showHelp() {
 #####
 
 logDebug "Detecting my full path as: ${SCRIPTPATH}"
+logDebug "Detecting initrd version as: ${VERSION}"
 
 if [ $# == 0 ]; then
 	showHelp
