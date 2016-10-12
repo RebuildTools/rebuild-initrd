@@ -19,6 +19,7 @@
 
 pushd `dirname $0` > /dev/null
 SCRIPTPATH=`pwd`
+VERSION=`git describe --tags --abbrev=5`
 popd > /dev/null
 
 ## Global
@@ -393,6 +394,9 @@ packageInitrd() {
 
 	logDebug "Copying initrd sources into build directory" && \cp -rf ${INITRD_SRC}/* ${BUILD_DIR}
 
+	logDebug "Writing initrd release file to build directory"
+	echo ${VERSION} > ${BUILD_DIR}/lib/rebuild/initrd-release
+
 	logDebug "Changing directories into initrd build directory" && cd ${BUILD_DIR}
 
 	logDebug "Build CPIO package and compressing to output file"
@@ -460,6 +464,7 @@ showHelp() {
 #####
 
 logDebug "Detecting my full path as: ${SCRIPTPATH}"
+logDebug "Detecting initrd version as: ${VERSION}"
 
 if [ $# == 0 ]; then
 	showHelp
