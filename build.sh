@@ -352,7 +352,23 @@ buildAgent() {
 	[ ! -d ${BUILD_DIR} ] && logFatal "The output directory [${BUILD_DIR}] doesn't exist, run \"prepareBuild\""
 
 	pushd ${INITRD_AGENT_SRC} >/dev/null
-	runCmd "Downloading golang agent dependencies" "glide install"
+	logDebug "Making fake GOPATH" #See golang/go#14566
+
+	local OLD_GOPATH=$GOPATH
+	local PKG_PATH="github.com/RebuildTools"
+	local PKG_NAME="rebuild-agent"
+	export GOPATH=$(pwd)/FAKE_GOPATH
+
+	mkdir -p ${GOPATH}/${PKG_PATH}
+	ln -s ${INITRD_AGENT_SRC} ${GOPATH}/${PKG_PATH}/${PKG_NAME}
+	
+	go env
+	ls -la ${GOPATH}/${PKG_PATH}/${PKG_NAME}
+
+	rm -rf ${GOPATH}
+	export GOPATH=$OLD_GOPATH
+
+	runCmd "Downloading golang agent dependencies" "glide update"
 	runCmd "Building golang agent" "go build -o ${BUILD_DIR}/bin/rebuild-agent rebuild-agent.go"
 	popd >/dev/null
 
