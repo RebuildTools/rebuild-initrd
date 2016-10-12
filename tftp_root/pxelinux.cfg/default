@@ -3,4 +3,4 @@ DEFAULT REBUILD_TEST
 LABEL REBUILD_TEST
 	MENU Rebuild Test
 	KERNEL files/linux-kernel
-	APPEND initrd=files/initrd.gz loglevel=6
+	APPEND initrd=files/initrd.gz loglevel=6 vga=792
