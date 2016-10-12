@@ -369,6 +369,7 @@ buildAgent() {
 	cd - >/dev/null
 	export GOPATH=${OLD_GOPATH}
 
+	logDebug "Copying shared libraries"
 	copyShareObjects "${BUILD_DIR}/bin/rebuild-agent" "${BUILD_DIR}"
 
 	logInfo "Finished building and installing the Rebuild Agent"
