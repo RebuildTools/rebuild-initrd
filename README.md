@@ -1,9 +1,9 @@
-Rebuild Agent [![Apache v2.0](https://img.shields.io/badge/License-Apache%20v2.0-blue.svg?style=flat-square)](http://www.apache.org/licenses/LICENSE-2.0) [![Github Releases](https://img.shields.io/github/downloads/RebuildTools/rebuild-agent/latest/total.svg?style=flat-square)](https://github.com/RebuildTools/rebuild-agent/releases)
+Rebuild Initrd [![Apache v2.0](https://img.shields.io/badge/License-Apache%20v2.0-blue.svg?style=flat-square)](http://www.apache.org/licenses/LICENSE-2.0) [![Github Releases](https://img.shields.io/github/downloads/RebuildTools/rebuild-initrd/latest/total.svg?style=flat-square)](https://github.com/RebuildTools/rebuild-agent/releases)
 =============
 
-_Lightweight system profiling for Rebuild_
+_Lightweight PXE-based system profiling for Rebuild_
 
-The Rebuild Agent is small, lightweight live Linux system that is booted via PXE booting that will profile the machine it is run on and return the profile to Rebuild to be displayed in the web interface.
+The Rebuild Initrd is small, lightweight live Linux system that is booted via PXE booting that will profile the machine it is run on and return the profile to Rebuild Core to be displayed in the web interface.
 
 Authors and Copyright
 =====================

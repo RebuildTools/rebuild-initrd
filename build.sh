@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# Rebuild Agent - Build Script
+# Rebuild Initrd - Build Script
 # ============================
 #
 # This rebuild script is a simple
-# way of building the Rebuild Agent
+# way of building the Rebuild Initrd
 # without having to manually run every
 # command required to produce the final
 # ramdisk
@@ -29,7 +29,7 @@ popd > /dev/null
 [ -z "${INITRD_SRC}" ] && INITRD_SRC=${SCRIPTPATH}/initrd_src
 
 ## Task: buildAgent
-[ -z "${INITRD_AGENT_SRC}" ] && INITRD_AGENT_SRC=${SCRIPTPATH}/agent_src
+[ -z "${INITRD_AGENT_SRC}" ] && INITRD_AGENT_SRC="github.com/RebuildTools/rebuild-agent"
 
 ## Task prepareBuild
 #// Dependency format: DEPENDENCY_NAME = SOURCE_URL % VERSION % DOWNLOAD_TYPE % BUILD_METHOD % CONFIGURE_FLAGS
@@ -341,40 +341,37 @@ prepareBuild() {
 buildAgent() {
 	logInfo "Building and installing Rebuild Agent"
 
-    checkForBinary "go"
-    checkForBinary "glide"
+	checkForBinary "go"
+	checkForBinary "glide"
 
-    logDebug "Checking for source files directory: ${INITRD_AGENT_SRC}"
-	[ ! -d ${INITRD_AGENT_SRC} ] && logFatal "The provided source directory [${INITRD_AGENT_SRC}] doesn't exist!"
 
-    local BUILD_DIR=${TEMP_DIR}/initrd_build
-    logDebug "Checking for build directory: ${BUILD_DIR}"
+	local BUILD_DIR=${TEMP_DIR}/initrd_build
+	logDebug "Checking for build directory: ${BUILD_DIR}"
 	[ ! -d ${BUILD_DIR} ] && logFatal "The output directory [${BUILD_DIR}] doesn't exist, run \"prepareBuild\""
 
-	pushd ${INITRD_AGENT_SRC} >/dev/null
-	logDebug "Making fake GOPATH" #See golang/go#14566
+	local OLD_GOPATH=${GOPATH}
+	export GOPATH=${TEMP_DIR}/go
+	[ -d ${GOPATH} ] && logWarn "Old temporary gopath exists, clearing it" && rm -rf ${GOPATH}
 
-	local OLD_GOPATH=$GOPATH
-	local PKG_PATH="github.com/RebuildTools"
-	local PKG_NAME="rebuild-agent"
-	export GOPATH=$(pwd)/FAKE_GOPATH
+	logDebug "Making temporary gopath" && mkdir -p ${GOPATH}/src/${INITRD_AGENT_SRC}
 
-	mkdir -p ${GOPATH}/${PKG_PATH}
-	ln -s ${INITRD_AGENT_SRC} ${GOPATH}/${PKG_PATH}/${PKG_NAME}
-	
-	go env
-	ls -la ${GOPATH}/${PKG_PATH}/${PKG_NAME}
+	runCmd "Downloading agent sources" "git clone http://${INITRD_AGENT_SRC} ${GOPATH}/src/${INITRD_AGENT_SRC}"
 
-	rm -rf ${GOPATH}
-	export GOPATH=$OLD_GOPATH
+	logDebug "Changing into source directory"
+	cd ${GOPATH}/src/${INITRD_AGENT_SRC}
 
-	runCmd "Downloading golang agent dependencies" "glide update"
-	runCmd "Building golang agent" "go build -o ${BUILD_DIR}/bin/rebuild-agent rebuild-agent.go"
-	popd >/dev/null
+	runCmd "Installing agent dependencies" "glide install"
 
-    copyShareObjects "${BUILD_DIR}/bin/rebuild-agent" "${BUILD_DIR}"
+	local AGENT_VERSION=$(git describe --tags --abbrev=5)
+	logDebug "Building Rebuild Agent v${AGENT_VERSION}"
+	go build -ldflags "-X github.com/RebuildTools/rebuild-agent/helpers.AgentVersion=${AGENT_VERSION}" -o ${BUILD_DIR}/bin/rebuild-agent ${INITRD_AGENT_SRC}
 
-    logInfo "Finished building and installing the Rebuild Agent"
+	cd - >/dev/null
+	export GOPATH=${OLD_GOPATH}
+
+	copyShareObjects "${BUILD_DIR}/bin/rebuild-agent" "${BUILD_DIR}"
+
+	logInfo "Finished building and installing the Rebuild Agent"
 }
 
 #// Builds the final initrd from
